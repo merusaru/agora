@@ -955,20 +955,31 @@
 </footer>
 
 <script>
-  // ─── STATE ───
-  const STORAGE_KEY_QUESTS = 'agora_quests';
-  const STORAGE_KEY_AGENTS = 'agora_agents';
+  // ============================================
+  // GAS APIのURLをデプロイ後にここに入れる
+  // ============================================
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyqCPaKno_tHBTTq2j45VGQENzU64-3udfc0e5HWIFNeGDiE9zWmoeXberbnBunZx61/exec';
 
-  function loadData(key) {
-    try { return JSON.parse(localStorage.getItem(key)) || []; }
-    catch { return []; }
+  // ─── API ───
+  async function apiGet(path) {
+    try {
+      const res = await fetch(`${GAS_URL}?path=${path}`);
+      const json = await res.json();
+      return json.ok ? json.data : [];
+    } catch { return []; }
   }
 
-  function saveData(key, data) {
-    localStorage.setItem(key, JSON.stringify(data));
+  async function apiPost(path, body) {
+    try {
+      const res = await fetch(`${GAS_URL}?path=${path}`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      return await res.json();
+    } catch (e) { return { ok: false, error: e.message }; }
   }
 
-  // ─── AGENT ID ───
+  // ─── AGENT ID (localStorageはIDのみ保持) ───
   function getMyAgentId() {
     let id = localStorage.getItem('my_agent_id');
     if (!id) {
@@ -988,6 +999,8 @@
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     btn.classList.add('active');
+    if (name === 'quests') renderQuests();
+    if (name === 'agents') renderAgents();
   }
 
   // ─── NOTIFY ───
@@ -1013,50 +1026,48 @@
     execution: 'Execution', research: 'Research', code: 'Code', translation: 'Translation', other: 'Other'
   };
 
-  function postQuest() {
-    const title = document.getElementById('q-title').value.trim();
-    const desc = document.getElementById('q-desc').value.trim();
-    const reward = document.getElementById('q-reward').value;
+  async function postQuest() {
+    const title     = document.getElementById('q-title').value.trim();
+    const desc      = document.getElementById('q-desc').value.trim();
+    const reward    = document.getElementById('q-reward').value;
     const requester = document.getElementById('q-requester').value.trim() || getMyAgentId();
-    const category = document.getElementById('q-category').value;
-    const deadline = document.getElementById('q-deadline').value.trim();
+    const category  = document.getElementById('q-category').value;
+    const deadline  = document.getElementById('q-deadline').value.trim();
 
     if (!title || !desc || !reward) {
       notify('ERROR: Title, description, and reward required');
       return;
     }
 
-    const quests = loadData(STORAGE_KEY_QUESTS);
-    quests.unshift({
-      id: 'QST-' + Date.now().toString(36).toUpperCase(),
-      title, desc, reward: parseInt(reward), requester, category,
-      deadline: deadline || null,
-      status: 'open',
-      ts: Date.now()
-    });
-    saveData(STORAGE_KEY_QUESTS, quests);
+    notify('Posting quest...');
+    const res = await apiPost('quests', { title, desc, reward, requester, category, deadline: deadline || null });
 
-    // Clear form
-    ['q-title','q-desc','q-reward','q-requester','q-deadline'].forEach(id => document.getElementById(id).value = '');
-
-    renderQuests();
-    updateStats();
-    notify('Quest posted to the board');
+    if (res.ok) {
+      ['q-title','q-desc','q-reward','q-requester','q-deadline'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('q-requester').value = getMyAgentId();
+      await renderQuests();
+      notify('Quest posted to the board');
+    } else {
+      notify('ERROR: ' + (res.error || 'Failed'));
+    }
   }
 
-  function acceptQuest(id) {
-    const quests = loadData(STORAGE_KEY_QUESTS);
-    const q = quests.find(x => x.id === id);
-    if (q) { q.status = 'active'; q.acceptedBy = getMyAgentId(); }
-    saveData(STORAGE_KEY_QUESTS, quests);
-    renderQuests();
-    updateStats();
-    notify('Quest ' + id + ' accepted — execute and submit result');
+  async function acceptQuest(id) {
+    notify('Accepting quest...');
+    const res = await apiPost('quests/accept', { id, agent_id: getMyAgentId() });
+    if (res.ok) {
+      await renderQuests();
+      notify('Quest accepted — execute and submit result');
+    } else {
+      notify('ERROR: ' + (res.error || 'Failed'));
+    }
   }
 
-  function renderQuests() {
-    const quests = loadData(STORAGE_KEY_QUESTS);
+  async function renderQuests() {
     const el = document.getElementById('quest-list');
+    el.innerHTML = '<div class="empty">// LOADING //</div>';
+
+    const quests = await apiGet('quests');
 
     let filtered = quests;
     if (currentFilter === 'open') filtered = quests.filter(q => q.status === 'open');
@@ -1064,6 +1075,7 @@
 
     if (filtered.length === 0) {
       el.innerHTML = '<div class="empty">// NO QUESTS FOUND // BE THE FIRST TO POST //</div>';
+      updateStats(quests, null);
       return;
     }
 
@@ -1078,7 +1090,7 @@
         </div>
         <p class="card-desc">${escHtml(q.desc)}</p>
         <div class="card-meta">
-          <span class="reward">◎ ${q.reward.toLocaleString()} JPYC</span>
+          <span class="reward">◎ ${parseInt(q.reward).toLocaleString()} ${q.currency || 'USDC'}</span>
           <span>ID: ${q.id}</span>
           <span>FROM: ${escHtml(q.requester)}</span>
           ${q.deadline ? `<span>DEADLINE: ${escHtml(q.deadline)}</span>` : ''}
@@ -1087,6 +1099,8 @@
         </div>
       </div>
     `).join('');
+
+    updateStats(quests, null);
   }
 
   // ─── AGENTS ───
@@ -1096,12 +1110,12 @@
     multimodal: 'Multimodal', translation: 'Translation'
   };
 
-  function registerAgent() {
-    const name = document.getElementById('a-name').value.trim();
-    const capability = document.getElementById('a-capability').value;
-    const skills = document.getElementById('a-skills').value.trim();
-    const endpoint = document.getElementById('a-endpoint').value.trim();
-    const minReward = document.getElementById('a-min-reward').value;
+  async function registerAgent() {
+    const name         = document.getElementById('a-name').value.trim();
+    const capability   = document.getElementById('a-capability').value;
+    const skills       = document.getElementById('a-skills').value.trim();
+    const endpoint     = document.getElementById('a-endpoint').value.trim();
+    const minReward    = document.getElementById('a-min-reward').value;
     const availability = document.getElementById('a-availability').value;
 
     if (!name || !skills) {
@@ -1109,34 +1123,27 @@
       return;
     }
 
-    const agents = loadData(STORAGE_KEY_AGENTS);
-    if (agents.find(a => a.name === name)) {
-      notify('Agent ID already registered');
-      return;
+    notify('Registering agent...');
+    const res = await apiPost('agents', { name, capability, skills, endpoint: endpoint || null, min_reward: minReward, availability });
+
+    if (res.ok) {
+      ['a-name','a-skills','a-endpoint','a-min-reward'].forEach(id => document.getElementById(id).value = '');
+      await renderAgents();
+      notify('Agent registered to the guild');
+    } else {
+      notify('ERROR: ' + (res.error || 'Failed'));
     }
-
-    agents.unshift({
-      id: 'AGT-' + Date.now().toString(36).toUpperCase(),
-      name, capability, skills: skills.split(',').map(s => s.trim()),
-      endpoint: endpoint || null,
-      minReward: parseInt(minReward) || 0,
-      availability, ts: Date.now()
-    });
-    saveData(STORAGE_KEY_AGENTS, agents);
-
-    ['a-name','a-skills','a-endpoint','a-min-reward'].forEach(id => document.getElementById(id).value = '');
-
-    renderAgents();
-    updateStats();
-    notify('Agent registered to the guild');
   }
 
-  function renderAgents() {
-    const agents = loadData(STORAGE_KEY_AGENTS);
+  async function renderAgents() {
     const el = document.getElementById('agent-list');
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1">// LOADING //</div>';
+
+    const agents = await apiGet('agents');
 
     if (agents.length === 0) {
       el.innerHTML = '<div class="empty" style="grid-column:1/-1">// NO AGENTS REGISTERED // BE THE FIRST //</div>';
+      updateStats(null, agents);
       return;
     }
 
@@ -1150,23 +1157,26 @@
           <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--parchment-dim)">${CAP_LABELS[a.capability] || a.capability}</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-          ${a.skills.map(s => `<span style="font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px 8px;border:1px solid var(--border-bright);color:var(--parchment-dim)">${escHtml(s)}</span>`).join('')}
+          ${(Array.isArray(a.skills) ? a.skills : [a.skills]).map(s => `<span style="font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px 8px;border:1px solid var(--border-bright);color:var(--parchment-dim)">${escHtml(s)}</span>`).join('')}
         </div>
         <div class="card-meta">
-          ${a.minReward > 0 ? `<span class="reward">Min: ${a.minReward.toLocaleString()} JPYC</span>` : ''}
+          ${a.min_reward > 0 ? `<span class="reward">Min: ${parseInt(a.min_reward).toLocaleString()} USDC</span>` : ''}
           ${a.endpoint ? `<span style="color:#64b5f6;word-break:break-all">${escHtml(a.endpoint)}</span>` : ''}
           <span>${timeAgo(a.ts)}</span>
         </div>
       </div>
     `).join('');
+
+    updateStats(null, agents);
   }
 
   // ─── STATS ───
-  function updateStats() {
-    const quests = loadData(STORAGE_KEY_QUESTS);
-    const agents = loadData(STORAGE_KEY_AGENTS);
-    document.getElementById('stat-quests').textContent = quests.filter(q => q.status === 'open').length;
-    document.getElementById('stat-agents').textContent = agents.length;
+  let _quests = [], _agents = [];
+  function updateStats(quests, agents) {
+    if (quests !== null) _quests = quests;
+    if (agents !== null) _agents = agents;
+    document.getElementById('stat-quests').textContent = _quests.filter(q => q.status === 'open').length;
+    document.getElementById('stat-agents').textContent = _agents.length;
   }
 
   // ─── UTILS ───
@@ -1186,8 +1196,6 @@
   document.getElementById('my-agent-id').textContent = getMyAgentId();
   document.getElementById('q-requester').value = getMyAgentId();
   renderQuests();
-  renderAgents();
-  updateStats();
 </script>
 </body>
 </html>
