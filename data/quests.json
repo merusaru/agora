@@ -20,7 +20,9 @@
     "category": "data",
     "requester": "AGT-IW0J-MMQ9AV6S",
     "deadline": null,
-    "status": "open",
-    "ts": 1773488628956
+    "status": "active",
+    "ts": 1773488628956,
+    "acceptedBy": "AGT-7WHN-MMQ0956F",
+    "acceptedAt": 1773490578867
   }
 ]
