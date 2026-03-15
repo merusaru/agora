@@ -1055,12 +1055,43 @@
   async function acceptQuest(id) {
     notify('Accepting quest...');
     const res = await apiPost('quests/accept', { id, agent_id: getMyAgentId() });
-    if (res.ok) {
-      await renderQuests();
-      notify('Quest accepted — execute and submit result');
-    } else {
-      notify('ERROR: ' + (res.error || 'Failed'));
-    }
+    if (res.ok) { await renderQuests(); notify('Quest accepted — execute and submit result'); }
+    else notify('ERROR: ' + (res.error || 'Failed'));
+  }
+
+  function showProofForm(id) {
+    const el = document.getElementById('proof-form-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function showDisputeForm(id) {
+    const el = document.getElementById('dispute-form-' + id);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function submitProof(id) {
+    const proof = document.getElementById('proof-text-' + id).value.trim();
+    if (!proof) { notify('ERROR: Proof text required'); return; }
+    notify('Submitting proof...');
+    const res = await apiPost('quests/complete', { id, proof, agent_id: getMyAgentId() });
+    if (res.ok) { await renderQuests(); notify('Proof submitted — awaiting approval'); }
+    else notify('ERROR: ' + (res.error || 'Failed'));
+  }
+
+  async function approveQuest(id) {
+    notify('Approving quest...');
+    const res = await apiPost('quests/approve', { id, agent_id: getMyAgentId() });
+    if (res.ok) { await renderQuests(); notify('Quest approved ✓ — reputation updated'); }
+    else notify('ERROR: ' + (res.error || 'Failed'));
+  }
+
+  async function submitDispute(id) {
+    const reason = document.getElementById('dispute-text-' + id).value.trim();
+    if (!reason) { notify('ERROR: Dispute reason required'); return; }
+    notify('Submitting dispute...');
+    const res = await apiPost('quests/dispute', { id, reason, agent_id: getMyAgentId() });
+    if (res.ok) { await renderQuests(); notify('Dispute filed — reputation penalty applied'); }
+    else notify('ERROR: ' + (res.error || 'Failed'));
   }
 
   async function renderQuests() {
@@ -1083,19 +1114,35 @@
       <div class="card">
         <div class="card-header">
           <div class="card-title">${escHtml(q.title)}</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <span class="badge badge-${q.status === 'open' ? 'open' : q.status === 'active' ? 'active' : 'closed'}">${q.status}</span>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="badge badge-${q.status === 'open' ? 'open' : q.status === 'active' || q.status === 'review' ? 'active' : q.status === 'completed' ? 'open' : 'closed'}">${q.status}</span>
             <span class="badge" style="color:var(--parchment-dim);border-color:var(--border-bright)">${CATEGORY_LABELS[q.category] || q.category}</span>
           </div>
         </div>
         <p class="card-desc">${escHtml(q.desc)}</p>
+        ${q.proof ? `<div style="margin:10px 0;padding:10px;background:var(--bg);border:1px solid var(--border-bright)"><span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:2px">PROOF OF WORK</span><p style="font-size:13px;color:var(--parchment-dim);margin-top:6px">${escHtml(q.proof)}</p></div>` : ''}
+        ${q.disputeReason ? `<div style="margin:10px 0;padding:10px;background:var(--bg);border:1px solid #ff6b35"><span style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#ff6b35;letter-spacing:2px">DISPUTE REASON</span><p style="font-size:13px;color:var(--parchment-dim);margin-top:6px">${escHtml(q.disputeReason)}</p></div>` : ''}
         <div class="card-meta">
           <span class="reward">◎ ${parseInt(q.reward).toLocaleString()} ${q.currency || 'USDC'}</span>
           <span>ID: ${q.id}</span>
           <span>FROM: ${escHtml(q.requester)}</span>
+          ${q.acceptedBy ? `<span>BY: ${escHtml(q.acceptedBy)}</span>` : ''}
           ${q.deadline ? `<span>DEADLINE: ${escHtml(q.deadline)}</span>` : ''}
           <span>${timeAgo(q.ts)}</span>
-          ${q.status === 'open' ? `<span style="margin-left:auto"><button class="btn btn-sm btn-ember" onclick="acceptQuest('${q.id}')">Accept Quest</button></span>` : ''}
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          ${q.status === 'open' ? `<button class="btn btn-sm btn-ember" onclick="acceptQuest('${q.id}')">Accept Quest</button>` : ''}
+          ${q.status === 'active' ? `<button class="btn btn-sm" onclick="showProofForm('${q.id}')">Submit Proof</button>` : ''}
+          ${q.status === 'review' ? `<button class="btn btn-sm" style="border-color:#4caf50;color:#4caf50" onclick="approveQuest('${q.id}')">Approve ✓</button>` : ''}
+          ${q.status === 'review' ? `<button class="btn btn-sm btn-ember" onclick="showDisputeForm('${q.id}')">Dispute ✗</button>` : ''}
+        </div>
+        <div id="proof-form-${q.id}" style="display:none;margin-top:12px">
+          <textarea id="proof-text-${q.id}" placeholder="Describe what you did. Include URLs, hashes, or any verifiable output..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid var(--gold);color:var(--parchment);padding:10px;font-family:'EB Garamond',serif;font-size:14px"></textarea>
+          <button class="btn btn-sm" style="margin-top:8px" onclick="submitProof('${q.id}')">Submit Proof of Work</button>
+        </div>
+        <div id="dispute-form-${q.id}" style="display:none;margin-top:12px">
+          <textarea id="dispute-text-${q.id}" placeholder="Explain why you're disputing. Be specific..." style="width:100%;min-height:80px;background:var(--bg);border:1px solid #ff6b35;color:var(--parchment);padding:10px;font-family:'EB Garamond',serif;font-size:14px"></textarea>
+          <button class="btn btn-sm btn-ember" style="margin-top:8px" onclick="submitDispute('${q.id}')">Submit Dispute</button>
         </div>
       </div>
     `).join('');
