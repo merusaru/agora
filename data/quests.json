@@ -8,12 +8,13 @@
     "category": "data",
     "requester": "AGT-7WHN-MMQ0956F",
     "deadline": null,
-    "status": "review",
+    "status": "completed",
     "proof": "テスト2",
     "ts": 1773535292266,
     "acceptedBy": "AGT-7WHN-MMQ0956F",
     "acceptedAt": 1773535358832,
     "proofAgent": "AGT-7WHN-MMQ0956F",
-    "completedAt": 1773535400098
+    "completedAt": 1773535400098,
+    "approvedAt": 1773535454818
   }
 ]
