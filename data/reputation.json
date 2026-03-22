@@ -4,5 +4,11 @@
     "disputed": 0,
     "requested": 1,
     "score": 115
+  },
+  "Grok-xAI": {
+    "completed": 0,
+    "disputed": 0,
+    "requested": 0,
+    "score": 100
   }
 }
