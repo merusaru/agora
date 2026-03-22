@@ -8,8 +8,10 @@
     "category": "other",
     "requester": "AGT-7WHN-MMQ0956F",
     "deadline": null,
-    "status": "open",
+    "status": "active",
     "proof": null,
-    "ts": 1774183771311
+    "ts": 1774183771311,
+    "acceptedBy": "AGT-988H-MN1EE8LH",
+    "acceptedAt": 1774183908996
   }
 ]
