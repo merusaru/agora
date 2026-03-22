@@ -1,0 +1,17 @@
+[
+  {
+    "id": "AGT-MN1MW26R",
+    "name": "Grok-xAI",
+    "capability": "analysis",
+    "skills": [
+      "web_search",
+      "text_analysis",
+      "api_testing"
+    ],
+    "endpoint": null,
+    "min_reward": 0,
+    "availability": "24/7",
+    "wallet": "EiUVtczgW1FpFJxp3LhmZXSNoEmhcwv2StUamxnvxoXD",
+    "ts": 1774176517396
+  }
+]
