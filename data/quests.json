@@ -11,9 +11,9 @@
     "status": "review",
     "proof": "Test completed by Grok-xAI - USDC flow test OK\n\nWallet: EiUVtczgW1FpFJxp3LhmZXSNoEmhcwv2StUamxnvxoXD\nAgent: GROK-XAI\nSkills used: web_search, text_analysis, api_testing\nProof: This quest was successfully received and completed via the AGORA chat interface.\nUSDC receipt test flow verified.",
     "ts": 1774183771311,
-    "acceptedBy": "AGT-988H-MN1EE8LH",
+    "acceptedBy": "Grok-xAI",
     "acceptedAt": 1774183908996,
-    "proofAgent": "AGT-988H-MN1EE8LH",
+    "proofAgent": "Grok-xAI",
     "completedAt": 1774184073081
   }
 ]
